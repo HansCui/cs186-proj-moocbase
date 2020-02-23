@@ -136,10 +136,9 @@ public class BPlusTree {
      */
     public Optional<RecordId> get(DataBox key) {
         typecheck(key);
-        // TODO(proj2): implement
-        // TODO(proj4_part2): B+ tree locking
+        return root.get(key).getKey(key);
 
-        return Optional.empty();
+        // TODO(proj4_part2): B+ tree locking
     }
 
     /**
@@ -189,10 +188,9 @@ public class BPlusTree {
      * memory will receive 0 points.
      */
     public Iterator<RecordId> scanAll() {
-        // TODO(proj2): Return a BPlusTreeIterator.
-        // TODO(proj4_part2): B+ tree locking
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.getLeftmostLeaf());
+        // TODO(proj4_part2): B+ tree locking
     }
 
     /**
@@ -220,10 +218,18 @@ public class BPlusTree {
      */
     public Iterator<RecordId> scanGreaterEqual(DataBox key) {
         typecheck(key);
-        // TODO(proj2): Return a BPlusTreeIterator.
-        // TODO(proj4_part2): B+ tree locking
+        LeafNode targetNode = this.root.get(key);
+        List<DataBox> NodeKeys = targetNode.getKeys();
+        BPlusTreeIterator testIter = new BPlusTreeIterator(targetNode);
 
-        return Collections.emptyIterator();
+        for (DataBox nodeKey : NodeKeys) {
+            if (nodeKey.getInt() < key.getInt()) {
+                testIter.next();
+            }
+        }
+
+        return testIter;
+        // TODO(proj4_part2): B+ tree locking
     }
 
     /**
@@ -237,10 +243,27 @@ public class BPlusTree {
      */
     public void put(DataBox key, RecordId rid) {
         typecheck(key);
-        // TODO(proj2): implement
+        Optional<Pair<DataBox, Long>> op = this.root.put(key, rid);
+
+        if (op.isPresent()){
+            Pair<DataBox, Long> p = op.get();
+            List<DataBox> newKeys = new ArrayList<>();
+            List<Long> newChildren = new ArrayList<>();
+
+            newKeys.add(p.getFirst());
+            newChildren.add(this.root.getPage().getPageNum());
+            newChildren.add(p.getSecond());
+
+            BPlusNode newRoot = new InnerNode(this.metadata, this.bufferManager,
+                    newKeys, newChildren, this.lockContext);
+
+            updateRoot(newRoot);
+        } else {
+            updateRoot(this.root);
+        }
+
         // TODO(proj4_part2): B+ tree locking
 
-        return;
     }
 
     /**
@@ -261,7 +284,31 @@ public class BPlusTree {
      * bulkLoad (see comments in BPlusNode.bulkLoad).
      */
     public void bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
-        // TODO(proj2): implement
+        if (!(root instanceof LeafNode && this.root.getLeftmostLeaf().getKeys().size() == 0
+                && this.root.getLeftmostLeaf().getRids().size() == 0)) {
+            throw new BPlusTreeException("Tree not initially empty when doing Bulkload!");
+        }
+
+        while (data.hasNext()) {
+            Optional<Pair<DataBox, Long>> op =  this.root.bulkLoad(data, fillFactor);
+            if (op.isPresent()) {
+                Pair<DataBox, Long> p = op.get();
+                List<DataBox> newKeys = new ArrayList<>();
+                List<Long> newChildren = new ArrayList<>();
+
+                newKeys.add(p.getFirst());
+                newChildren.add(this.root.getPage().getPageNum());
+                newChildren.add(p.getSecond());
+
+                BPlusNode newRoot = new InnerNode(this.metadata, this.bufferManager,
+                        newKeys, newChildren, this.lockContext);
+
+                updateRoot(newRoot);
+            } else {
+                updateRoot(this.root);
+            }
+        }
+
         // TODO(proj4_part2): B+ tree locking
 
         return;
@@ -280,7 +327,8 @@ public class BPlusTree {
      */
     public void remove(DataBox key) {
         typecheck(key);
-        // TODO(proj2): implement
+        this.root.remove(key);
+        updateRoot(this.root);
         // TODO(proj4_part2): B+ tree locking
 
         return;
@@ -384,20 +432,36 @@ public class BPlusTree {
 
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
-        // TODO(proj2): Add whatever fields and constructors you want here.
+        private LeafNode currNode;
+        Iterator<RecordId> nodeIterator;
+
+        BPlusTreeIterator(LeafNode node) {
+            this.currNode = node;
+            this.nodeIterator = this.currNode.scanAll();
+        }
 
         @Override
         public boolean hasNext() {
-            // TODO(proj2): implement
-
+            if (this.nodeIterator.hasNext()) {
+                return true;
+            } else {
+                Optional<LeafNode> op = this.currNode.getRightSibling();
+                if (op.isPresent()) {
+                    this.currNode = op.get();
+                    this.nodeIterator = this.currNode.scanAll();
+                    return this.hasNext();
+                }
+            }
             return false;
         }
 
         @Override
         public RecordId next() {
-            // TODO(proj2): implement
-
-            throw new NoSuchElementException();
+            if (!this.hasNext()) {
+                throw new NoSuchElementException();
+            } else {
+                return this.nodeIterator.next();
+            }
         }
     }
 }

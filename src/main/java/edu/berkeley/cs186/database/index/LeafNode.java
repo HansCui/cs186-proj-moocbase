@@ -10,6 +10,7 @@ import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
+import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.RecordId;
 
 /**
@@ -140,42 +141,127 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
-
-        return null;
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        // TODO(proj2): implement
-
-        return null;
+        return this;
     }
+
+
+    //private comparator
+    private class compairPair implements Comparator<Pair> {
+        @Override
+        public int compare(Pair p1, Pair p2) {
+            DataBox k1 = (DataBox) p1.getFirst();
+            DataBox k2 = (DataBox) p2.getFirst();
+
+            return k1.getInt() - k2.getInt();
+        }
+    }
+
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        if (this.keys.contains(key)) {
+            throw new BPlusTreeException("No duplicate keys!");
+        }
 
-        return Optional.empty();
+        List<Pair> tempMap = new ArrayList<>();
+        List<DataBox> newKeys = new ArrayList<>();
+        List<RecordId> newRids = new ArrayList<>();
+
+        for (int i=0; i<this.keys.size(); i++) {
+            tempMap.add(new Pair<>(this.keys.get(i), this.rids.get(i)));
+        }
+        tempMap.add(new Pair<>(key, rid));
+
+        Collections.sort(tempMap, new compairPair());
+
+        for (int i=0; i<tempMap.size(); i++) {
+            newKeys.add((DataBox) tempMap.get(i).getFirst());
+            newRids.add((RecordId) tempMap.get(i).getSecond());
+        }
+
+        int d = this.metadata.getOrder();
+        if (newKeys.size() <= 2*d) {
+            this.keys = newKeys;
+            this.rids = newRids;
+            sync();
+            return Optional.empty();
+        } else {
+            DataBox splitKey = newKeys.get(d);
+            List<DataBox> keys1 = newKeys.subList(0, d);
+            List<RecordId> rids1 = newRids.subList(0, d);
+            List<DataBox> keys2 = newKeys.subList(d, newKeys.size());
+            List<RecordId> rids2 = newRids.subList(d, newRids.size());
+
+            LeafNode newNode = new LeafNode(this.metadata, this.bufferManager, keys2, rids2,
+                    this.rightSibling, this.treeContext);
+
+            this.keys = keys1;
+            this.rids = rids1;
+            long pointerToNewNode = newNode.getPage().getPageNum();
+            this.rightSibling = Optional.of(pointerToNewNode);
+
+            sync();
+            return Optional.of(new Pair<>(splitKey, pointerToNewNode));
+        }
     }
 
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
 
-        return Optional.empty();
+        List<DataBox> newKeys = new ArrayList<>(this.keys);
+        List<RecordId> newRids = new ArrayList<>(this.rids);
+        int d = this.metadata.getOrder();
+        int filledSize = (int) Math.ceil(d*2*fillFactor);
+
+        while (data.hasNext() && newKeys.size() <= filledSize) {
+            Pair<DataBox, RecordId> p = data.next();
+            newKeys.add(p.getFirst());
+            newRids.add(p.getSecond());
+        }
+
+        if (newKeys.size() <= filledSize) {
+            this.keys = newKeys;
+            this.rids = newRids;
+            sync();
+            return Optional.empty();
+        } else {
+            DataBox splitKey = newKeys.get(filledSize);
+            List<DataBox> keys1 = newKeys.subList(0, filledSize);
+            List<RecordId> rids1 = newRids.subList(0, filledSize);
+            List<DataBox> keys2 = newKeys.subList(filledSize, newKeys.size());
+            List<RecordId> rids2 = newRids.subList(filledSize, newRids.size());
+
+            LeafNode newNode = new LeafNode(this.metadata, this.bufferManager, keys2, rids2,
+                    this.rightSibling, this.treeContext);
+
+            this.keys = keys1;
+            this.rids = rids1;
+            long pointerToNewNode = newNode.getPage().getPageNum();
+            this.rightSibling = Optional.of(pointerToNewNode);
+
+            sync();
+            return Optional.of(new Pair<>(splitKey, pointerToNewNode));
+        }
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        if (this.keys.contains(key)) {
+            int i = this.keys.indexOf(key);
+            this.keys.remove(i);
+            this.rids.remove(i);
+        }
+        sync();
     }
 
     // Iterators /////////////////////////////////////////////////////////////////
@@ -362,9 +448,26 @@ class LeafNode extends BPlusNode {
      */
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
-        // TODO(proj2): implement
+        Page page = bufferManager.fetchPage(treeContext, pageNum, false);
+        Buffer buf = page.getBuffer();
 
-        return null;
+        assert (buf.get() == (byte) 1);
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> children = new ArrayList<>();
+
+        Optional<Long> next = Optional.of(buf.getLong());
+        if (next.get().equals((long) -1)) {
+            next = Optional.empty();
+        }
+        int n = buf.getInt();
+
+        for (int i = 0; i < n; ++i) {
+            keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
+            children.add(new RecordId(buf.getLong(), buf.getShort()));
+        }
+
+        return new LeafNode(metadata, bufferManager, page, keys, children, next, treeContext);
     }
 
     // Builtins //////////////////////////////////////////////////////////////////

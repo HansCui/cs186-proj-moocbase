@@ -90,8 +90,6 @@ class BNLJOperator extends JoinOperator {
         private void fetchNextLeftBlock() {
             if (!leftIterator.hasNext()) {
                 throw new NoSuchElementException("BNLJ Left All Done!");
-//                leftRecord = null;
-//                leftRecordIterator = null;
             }
 
             int chunkSize = numBuffers - 2;
@@ -117,10 +115,6 @@ class BNLJOperator extends JoinOperator {
                 throw new NoSuchElementException("BNLJ Right All Done!");
             }
 
-//            if (!leftIterator.hasNext()) {
-//                rightRecordIterator = null;
-//                return;
-//            }
             int chunkSize = 1;
 
             rightRecordIterator = BNLJOperator.this.getBlockIterator(this.getRightTableName(), rightIterator, chunkSize);
@@ -144,10 +138,6 @@ class BNLJOperator extends JoinOperator {
             assert(rightRecordIterator.hasNext());
         }
 
-//        private void joinBlockNPage(BacktrackingIterator<Page> blockIter, BacktrackingIterator<Page> pageIter) {
-//
-//        }
-
         /**
          * Fetches the next record to return, and sets nextRecord to it. If there are no more
          * records to return, a NoSuchElementException should be thrown.
@@ -155,7 +145,6 @@ class BNLJOperator extends JoinOperator {
          * @throws NoSuchElementException if there are no more Records to yield
          */
         private void fetchNextRecord() {
-            // TODO(proj3_part1): implement
             if (this.leftRecord == null) {
                 throw new NoSuchElementException("BNLJ No new record to fetch");
             }

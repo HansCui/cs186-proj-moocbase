@@ -71,10 +71,29 @@ public class SortOperator {
      * size of the buffer, but it is done this way for ease.
      */
     public Run sortRun(Run run) {
-        // TODO(proj3_part1): implement
+        if (!run.iterator().hasNext()){
+            return null;
+        }
+        List<Record> recs = new ArrayList<>();
 
-        return null;
+        for (Record r : run) {
+            recs.add(r);
+        }
+
+        recs.sort(this.comparator);
+        return createRunFromIterator(this.transaction.getRecordIterator(run.tableName()));
     }
+
+//    private boolean checkContinue(List<Run> runs) {
+//        boolean cont = false;
+//
+//        for (Run r : runs) {
+//            if (r.iterator().hasNext()) {
+//                cont = true;
+//            }
+//        }
+//        return cont;
+//    }
 
     /**
      * Given a list of sorted runs, returns a NEW run that is the result
@@ -86,8 +105,32 @@ public class SortOperator {
      */
     public Run mergeSortedRuns(List<Run> runs) {
         // TODO(proj3_part1): implement
+        if (runs.isEmpty()) {
+            return null;
+        }
 
-        return null;
+        PriorityQueue<Pair<Record, Integer>> pq = new PriorityQueue<>(new RecordPairComparator());
+        for (int i=0; i < runs.size(); i++) {
+            Run r = runs.get(i);
+            Iterator<Record> rIter = r.iterator();
+            if (rIter.hasNext()) {
+                pq.add(new Pair<>(rIter.next(), i));
+            }
+        }
+//        boolean cont = checkContinue(runs);
+        Run mergedRun = createRun();
+
+        while (!pq.isEmpty()) {
+            Pair<Record, Integer> tempPair = pq.poll();
+            mergedRun.addRecord(tempPair.getFirst().getValues());
+
+            Iterator<Record> nextRunIter = runs.get(tempPair.getSecond()).iterator();
+            if (nextRunIter.hasNext()) {
+                pq.add(new Pair<>(nextRunIter.next(), tempPair.getSecond()));
+            }
+//            cont = checkContinue(runs);
+        }
+        return mergedRun;
     }
 
     /**

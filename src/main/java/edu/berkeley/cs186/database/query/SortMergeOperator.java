@@ -57,7 +57,6 @@ class SortMergeOperator extends JoinOperator {
 
         private SortMergeIterator() {
             super();
-            // TODO(proj3_part1): implement
             SortOperator leftSortOp = new SortOperator(SortMergeOperator.this.getTransaction(),
                     this.getLeftTableName(), new LeftRecordComparator());
             SortOperator rightSortOp = new SortOperator(SortMergeOperator.this.getTransaction(),
@@ -132,7 +131,6 @@ class SortMergeOperator extends JoinOperator {
          */
         @Override
         public boolean hasNext() {
-            // TODO(proj3_part1): implement
             return this.nextRecord != null;
         }
 
@@ -144,7 +142,6 @@ class SortMergeOperator extends JoinOperator {
          */
         @Override
         public Record next() {
-            // TODO(proj3_part1): implement
             if (!this.hasNext()) {
                 throw new NoSuchElementException();
             }

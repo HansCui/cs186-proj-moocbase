@@ -84,11 +84,9 @@ class SortMergeOperator extends JoinOperator {
             if (!rightIterator.hasNext() && leftRecord != null) {
                 rightIterator.reset();
                 advanceLeft();
-                this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
                 this.marked = false;
-            } else {
-                this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
             }
+            this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
         }
 
         private void mark() {
@@ -119,15 +117,10 @@ class SortMergeOperator extends JoinOperator {
                     advanceRight();
                 } else {
                     rightIterator.reset();
-//                    advanceLeft();
+                    advanceRight();
+                    advanceLeft();
                     this.marked = false;
                 }
-//                if (this.rightRecord == null) {
-//                    rightIterator.reset();
-//                    advanceLeft();
-//                    advanceRight();
-//                    this.marked = false;
-//                }
             }
         }
 

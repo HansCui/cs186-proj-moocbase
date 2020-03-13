@@ -65,11 +65,11 @@ class SortMergeOperator extends JoinOperator {
             this.leftIterator = SortMergeOperator.this.getRecordIterator(leftSortOp.sort());
             this.rightIterator = SortMergeOperator.this.getRecordIterator(rightSortOp.sort());
 
+            this.leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
+            this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
             this.marked = false;
 
             try {
-                advanceLeft();
-                advanceRight();
                 fetchNextRecord();
             } catch (NoSuchElementException e) {
                 this.nextRecord = null;
@@ -77,17 +77,18 @@ class SortMergeOperator extends JoinOperator {
         }
 
         private void advanceLeft() {
-            if (!this.leftIterator.hasNext()) {
-                throw new NoSuchElementException();
-            }
-            this.leftRecord = leftIterator.next();
+            this.leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
         }
 
         private void advanceRight() {
-            if (!this.rightIterator.hasNext()) {
-                throw new NoSuchElementException();
+            if (!rightIterator.hasNext() && leftRecord != null) {
+                rightIterator.reset();
+                advanceLeft();
+                this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+                this.marked = false;
+            } else {
+                this.rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
             }
-            this.rightRecord = rightIterator.next();
         }
 
         private void mark() {
@@ -99,7 +100,7 @@ class SortMergeOperator extends JoinOperator {
             this.nextRecord = null;
             Comparator<Record> c = new leftRightComparator();
             while (!hasNext()) {
-                if (!this.leftIterator.hasNext() || !this.rightIterator.hasNext()) {
+                if (this.leftRecord == null) {
                     throw new NoSuchElementException();
                 }
 
@@ -118,9 +119,15 @@ class SortMergeOperator extends JoinOperator {
                     advanceRight();
                 } else {
                     rightIterator.reset();
-                    advanceLeft();
+//                    advanceLeft();
                     this.marked = false;
                 }
+//                if (this.rightRecord == null) {
+//                    rightIterator.reset();
+//                    advanceLeft();
+//                    advanceRight();
+//                    this.marked = false;
+//                }
             }
         }
 
